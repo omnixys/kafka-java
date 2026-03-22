@@ -3,6 +3,16 @@
 All notable changes in this project will be documented in this file.
 
 
+## 1.0.0 (2026-03-22)
+
+### Init
+
+* **Init:** initial comit ([](https://github.com/omnixys/kafka-java/commit/b662bc82d5105433fd95c3ba6250879420c71ed9))
+
+### Other
+
+* **Other:** Initial commit ([](https://github.com/omnixys/kafka-java/commit/01c0f1c044a5884df9c634922e4eee3606c06942))
+
 ## [2.0.0](https://github.com/omnixys/kafka-java/compare/v1.1.1...v2.0.0) (2026-03-22)
 
 ### Other
