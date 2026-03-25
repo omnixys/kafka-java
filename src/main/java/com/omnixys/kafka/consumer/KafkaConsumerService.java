@@ -49,7 +49,7 @@ public class KafkaConsumerService {
         );
 
         record.headers().forEach(h -> {
-            log.debug("CONSUMER HEADER {} = {}", h.key(), new String(h.value()));
+            log.info("CONSUMER HEADER {} = {}", h.key(), new String(h.value()));
         });
 
         Context parentContext = GlobalOpenTelemetry.get()
@@ -76,23 +76,29 @@ public class KafkaConsumerService {
 
         try (var scope = span.makeCurrent()) {
 
-            KafkaEnvelope<?> envelope = mapper.readValue(record.value(), new TypeReference<KafkaEnvelope<Object>>() {});
+            KafkaEnvelope<?> envelope =
+                    mapper.readValue(
+                            record.value(),
+                            new TypeReference<KafkaEnvelope<Object>>() {}
+                    );
 
-            if (envelope.metadata() != null) {
-                envelope.metadata().forEach((key, value) -> {
-                    if (key != null && value != null) {
-                        span.setAttribute("app." + key, value);
-                    }
-                });
-            }
-
-            Map<String, String> headerMap =
-                    KafkaHeaderUtils.toMap(record.headers());
+            // 🔥 Headers → Map
+            Map<String, String> headerMap = KafkaHeaderUtils.toMap(record.headers());
 
             log.debug("Headers: {}", headerMap);
 
-            dispatcher.dispatch(record.topic(), envelope, headerMap);
+            // ✅ Custom metadata → Span Attributes
+            headerMap.forEach((key, value) -> {
+                if (key != null && value != null) {
 
+                    // nur deine custom keys
+                    if (key.startsWith("x-meta-")) {
+                        span.setAttribute("app." + key, value);
+                    }
+                }
+            });
+
+            dispatcher.dispatch(record.topic(), envelope, headerMap);
         } catch (Exception e) {
 
             log.error("Kafka consume failed topic={} partition={} offset={}",

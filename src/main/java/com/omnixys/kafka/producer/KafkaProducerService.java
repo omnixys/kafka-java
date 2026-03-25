@@ -1,20 +1,22 @@
 package com.omnixys.kafka.producer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.omnixys.kafka.adapter.KafkaHeaderAdapter;
 import com.omnixys.kafka.model.KafkaEnvelope;
 import com.omnixys.kafka.model.KafkaHeaderMapper;
-import com.omnixys.kafka.utils.KafkaHeaderSetter;
-import io.opentelemetry.api.GlobalOpenTelemetry;
-import io.opentelemetry.context.Context;
+import com.omnixys.kafka.model.KafkaMetaData;
+import com.omnixys.observability.api.TraceContext;
+import com.omnixys.observability.api.TracePropagation;
+import com.omnixys.observability.api.TraceSpanKind;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.kafka.core.KafkaTemplate;
 
-import com.omnixys.observability.context.TraceContextExtractor;
-import com.omnixys.observability.propagation.ContextPropagator;
-import com.omnixys.observability.propagation.W3CTraceContextPropagator;
-import com.omnixys.kafka.utils.KafkaHeaderCarrier;
+import java.nio.charset.StandardCharsets;
+
+import static com.omnixys.kafka.utils.MetadataKeys.SPAN_ID;
+import static com.omnixys.kafka.utils.MetadataKeys.TRACE_ID;
 
 /**
  * Kafka producer with OpenTelemetry propagation.
@@ -25,44 +27,106 @@ public class KafkaProducerService {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final TracePropagation<Object> tracing;
 
-    public <T> void send(String topic, KafkaEnvelope<T> envelope) {
-        send(topic, envelope, null);
+    public <T> void send(
+            String topic,
+            KafkaEnvelope<T> envelope,
+            KafkaMetaData meta
+    ) {
+        send(topic, envelope, meta, null);
+    }
+
+    public <T> void send(
+            String topic,
+            KafkaEnvelope<T> envelope,
+            KafkaMetaData meta,
+            TraceContext ctx,
+            String key
+    ) {
+        try {
+        String json = objectMapper.writeValueAsString(envelope);
+
+        ProducerRecord<String, String> record =
+                new ProducerRecord<>(topic, key, json);
+
+        tracing.inject(new KafkaHeaderAdapter(record.headers()));
+
+        KafkaHeaderMapper.addMetadata(
+                record.headers(),
+                meta
+        );
+
+        if (ctx != null) {
+            record.headers().add(
+                    TRACE_ID,
+                    ctx.traceId().getBytes(StandardCharsets.UTF_8)
+            );
+
+            record.headers().add(
+                    SPAN_ID,
+                    ctx.spanId().getBytes(StandardCharsets.UTF_8)
+            );
+        }
+        record.headers().forEach(h -> {
+            log.info("HEADER {} = {}", h.key(), new String(h.value()));
+        });
+
+        kafkaTemplate.send(record);
+        } catch (Exception e) {
+            throw new RuntimeException("Kafka send failed topic=" + topic, e);
+        }
     }
 
 
     public <T> void send(
             String topic,
             KafkaEnvelope<T> envelope,
+            KafkaMetaData meta,
             String key
     ) {
         try {
-            Context context = Context.current();
-            String json = objectMapper.writeValueAsString(envelope);
+            tracing.runWithSpan("Kafka PRODUCE " + topic, TraceSpanKind.PRODUCER, () -> {
+                try {
+                    String json = objectMapper.writeValueAsString(envelope);
 
-            ProducerRecord<String, String> record =
-                    new ProducerRecord<>(topic, key, json);
+                    ProducerRecord<String, String> record =
+                            new ProducerRecord<>(topic, key, json);
 
-            GlobalOpenTelemetry.get()
-                    .getPropagators()
-                    .getTextMapPropagator()
-                    .inject(context, record.headers(), new KafkaHeaderSetter());
+                    tracing.inject(new KafkaHeaderAdapter(record.headers()));
 
-            log.debug("Envelope meta Data = {}", envelope.metadata());
+                    KafkaHeaderMapper.addMetadata(
+                            record.headers(),
+                            meta
+                    );
 
-            KafkaHeaderMapper.addMetadata(
-                    record.headers(),
-                    envelope.metadata()
-            );
+                    TraceContext ctx = tracing.currentContext();
+                    if (ctx != null) {
+                        record.headers().add(
+                                TRACE_ID,
+                                ctx.traceId().getBytes(StandardCharsets.UTF_8)
+                        );
 
-            record.headers().forEach(h -> {
-                log.debug("HEADER {} = {}", h.key(), new String(h.value()));
+                        record.headers().add(
+                                SPAN_ID,
+                                ctx.spanId().getBytes(StandardCharsets.UTF_8)
+                        );
+                    }
+
+                    record.headers().forEach(h -> {
+                        log.info("HEADER {} = {}", h.key(), new String(h.value()));
+                    });
+
+
+                    kafkaTemplate.send(record);
+                    log.debug("Kafka message sent topic={} key={}", topic, key);
+                    return null;
+                } catch (Exception e) {
+                    throw new RuntimeException("Kafka send failed topic=" + topic, e);
+                } finally {
+
+                }
             });
-
-            kafkaTemplate.send(record);
-
-            log.debug("Kafka message sent topic={} key={}", topic, key);
-
         } catch (Exception e) {
             throw new RuntimeException("Kafka send failed topic=" + topic, e);
         }

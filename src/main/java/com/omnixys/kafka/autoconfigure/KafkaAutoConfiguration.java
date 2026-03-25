@@ -5,6 +5,7 @@ import com.omnixys.kafka.config.OmnixysKafkaProperties;
 import com.omnixys.kafka.consumer.KafkaConsumerService;
 import com.omnixys.kafka.dispatcher.KafkaEventDispatcher;
 import com.omnixys.kafka.producer.KafkaProducerService;
+import com.omnixys.observability.api.TracePropagation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -57,9 +58,10 @@ public class KafkaAutoConfiguration {
     @ConditionalOnMissingBean
     public KafkaProducerService kafkaProducerService(
             KafkaTemplate<String, String> kafkaTemplate,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            TracePropagation<Object> tracing
     ) {
-        return new KafkaProducerService(kafkaTemplate, objectMapper);
+        return new KafkaProducerService(kafkaTemplate, objectMapper, tracing);
     }
 
     @Bean
