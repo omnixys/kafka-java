@@ -9,7 +9,7 @@ plugins {
 
 group = project.findProperty("group") as String
 version = project.findProperty("version") as String
-description = "Omnixys Kafka Spring Package"
+description = "Omnixys Kafka Spring Integration Package"
 
 java {
     toolchain {
@@ -92,13 +92,13 @@ publishing {
             from(components["java"])
 
             groupId = project.group.toString()
-            artifactId = "omnixys-kafka"
+            artifactId = findProperty("artifactId") as String
             version = project.version.toString()
 
             pom {
-                name.set("Omnixys Kafka")
-                description.set("Omnixys Kafka Spring Integration Package")
-                url.set("https://github.com/omnixys/kafka-java")
+                name.set(findProperty("name") as String)
+                description.set("$description")
+                url.set(findProperty("url") as String)
 
                 licenses {
                     license {
