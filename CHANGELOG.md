@@ -16,6 +16,34 @@ All notable changes in this project will be documented in this file.
 ### Other
 
 * **Other:** Initial commit ([](https://github.com/omnixys/kafka-java/commit/01c0f1c044a5884df9c634922e4eee3606c06942))
+* **Other:** Merge branch 'main' of https://github.com/omnixys/kafka-java ([](https://github.com/omnixys/kafka-java/commit/6b41ca9f3762e4fed8442f9e0a0c6d764bd4fd65))
+* **Other:** Merge branch 'main' of https://github.com/omnixys/kafka-java ([](https://github.com/omnixys/kafka-java/commit/99ae74f48fd54edf9e5231aa3ec4552e106883f0))
+* **Other:** Update build.gradle.kts ([](https://github.com/omnixys/kafka-java/commit/c178f845a65a003c64cb70b19a822006c35f0a85))
+
+### Release
+
+* **Release:** 1.0.0 [skip ci] ([](https://github.com/omnixys/kafka-java/commit/86e8f3583332770093dc475775089b2d040cf9d2))
+* **Release:** 1.0.0 [skip ci] ([](https://github.com/omnixys/kafka-java/commit/8dd00a13f51af3d5623a5f586398c51f6f65210c))
+* **Release:** 2.0.0 [skip ci] ([](https://github.com/omnixys/kafka-java/commit/52172809b5621b54db85bdef7cd4847a7c49df65))
+
+### Test
+
+* **Test:** test ([](https://github.com/omnixys/kafka-java/commit/bede8d7551ef0e69a62c6c6eece95cd9d4e87b9c))
+* **Test:** update ([](https://github.com/omnixys/kafka-java/commit/444dfb01f51f94fe8e7dd11b0ff1a6064e348541))
+
+## 1.0.0 (2026-04-17)
+
+### Init
+
+* **Init:** initial comit ([](https://github.com/omnixys/kafka-java/commit/b662bc82d5105433fd95c3ba6250879420c71ed9))
+
+### Kafka
+
+* **Kafka:** Integrate observability propagation & metadata ([](https://github.com/omnixys/kafka-java/commit/8095fbb70d3f790dc6535c5b9a834234f0383761))
+
+### Other
+
+* **Other:** Initial commit ([](https://github.com/omnixys/kafka-java/commit/01c0f1c044a5884df9c634922e4eee3606c06942))
 * **Other:** Merge branch 'main' of https://github.com/omnixys/kafka-java ([](https://github.com/omnixys/kafka-java/commit/99ae74f48fd54edf9e5231aa3ec4552e106883f0))
 * **Other:** Update build.gradle.kts ([](https://github.com/omnixys/kafka-java/commit/c178f845a65a003c64cb70b19a822006c35f0a85))
 
