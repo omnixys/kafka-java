@@ -44,11 +44,10 @@ dependencyManagement {
 }
 
 dependencies {
-    api("com.omnixys.observability:observability:1.0.0")
+    api("com.omnixys:observability:1.0.0")
 
     api("org.springframework.kafka:spring-kafka")
     api("org.springframework.boot:spring-boot-autoconfigure")
-
 
     implementation("com.fasterxml.jackson.core:jackson-databind")
 

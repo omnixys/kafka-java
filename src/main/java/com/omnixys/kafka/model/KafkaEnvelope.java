@@ -15,8 +15,8 @@ import static com.omnixys.kafka.utils.MetadataKeys.*;
  */
 public record KafkaEnvelope<T>(
         String eventId,
-        EventType eventType,
         String eventName,
+        EventType eventType,
         String eventVersion,
         String service,
         Instant timestamp,
@@ -54,8 +54,8 @@ public record KafkaEnvelope<T>(
 
         return new KafkaEnvelope<>(
                 UUID.randomUUID().toString(),
-                eventType,
                 eventName,
+                eventType,
                 version,
                 service,
                 Instant.now(),
@@ -72,8 +72,8 @@ public record KafkaEnvelope<T>(
 
         return new KafkaEnvelope<>(
                 this.eventId,
-                this.eventType,
                 this.eventName,
+                this.eventType,
                 this.eventVersion,
                 this.service,
                 this.timestamp,
@@ -91,8 +91,8 @@ public record KafkaEnvelope<T>(
 
         return new KafkaEnvelope<>(
                 this.eventId,
-                this.eventType,
                 this.eventName,
+                this.eventType,
                 this.eventVersion,
                 this.service,
                 this.timestamp,
@@ -109,8 +109,8 @@ public record KafkaEnvelope<T>(
 
         return new KafkaEnvelope<>(
                 this.eventId,
-                this.eventType,
                 this.eventName,
+                this.eventType,
                 this.eventVersion,
                 this.service,
                 this.timestamp,

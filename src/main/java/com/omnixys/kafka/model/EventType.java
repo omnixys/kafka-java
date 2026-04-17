@@ -2,5 +2,8 @@ package com.omnixys.kafka.model;
 
 public enum EventType {
     LOG,
-    EVENT
+    EVENT,
+    METRIC,
+    ALERT,
+    COMMAND
 }
