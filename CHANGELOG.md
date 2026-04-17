@@ -3,6 +3,12 @@
 All notable changes in this project will be documented in this file.
 
 
+## [2.0.0](https://github.com/omnixys/kafka-java/compare/v1.0.0...v2.0.0) (2026-03-25)
+
+### Kafka
+
+* **Kafka:** Integrate observability propagation & metadata ([](https://github.com/omnixys/kafka-java/commit/8095fbb70d3f790dc6535c5b9a834234f0383761))
+
 ## 1.0.0 (2026-03-22)
 
 ### Init
