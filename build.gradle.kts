@@ -44,7 +44,7 @@ dependencyManagement {
 }
 
 dependencies {
-    api("com.omnixys.observability:omnixys-observability:2.0.0")
+    api("com.omnixys.observability:omnixys-observability:1.0.0")
 
     api("org.springframework.kafka:spring-kafka")
     api("org.springframework.boot:spring-boot-autoconfigure")
