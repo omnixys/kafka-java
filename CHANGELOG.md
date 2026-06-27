@@ -3,6 +3,12 @@
 All notable changes in this project will be documented in this file.
 
 
+## [2.0.0](https://github.com/omnixys/kafka-java/compare/v1.0.0...v2.0.0) (2026-06-27)
+
+### CD/CI
+
+* **CD/CI:** add action workflows ([](https://github.com/omnixys/kafka-java/commit/2acce0713da247843c0bdc22920c9081ef898eb3))
+
 ## 1.0.0 (2026-04-17)
 
 ### Init
