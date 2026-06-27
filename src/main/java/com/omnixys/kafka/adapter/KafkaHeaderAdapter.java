@@ -14,6 +14,6 @@ public class KafkaHeaderAdapter implements HeaderSetter {
     @Override
     public void set(String key, String value) {
         headers.remove(key);
-        headers.add(key, value.getBytes());
+        headers.add(key, value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }

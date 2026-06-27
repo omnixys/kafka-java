@@ -15,6 +15,6 @@ public record KafkaMetaData(
         service = service != null ? service : "unknown-service";
         version = version != null ? version : "1";
         clazz = clazz != null ? clazz : "unknown-class";
-        operation = operation != null ? version : "unknown-operation";
+        operation = operation != null ? operation : "unknown-operation";
     }
 }

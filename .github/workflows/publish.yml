@@ -81,7 +81,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 25
+          java-version: 26
 
       # 🔥 SINGLE SOURCE OF TRUTH = gradle.properties
       - name: Extract version from gradle.properties
@@ -92,6 +92,17 @@ jobs:
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
+
+      - name: 🔐 Configure Gradle credentials for GitHub Packages
+        run: |
+          mkdir -p ~/.gradle
+          cat <<EOF > ~/.gradle/gradle.properties
+          gpr.user=${GITHUB_ACTOR}
+          gpr.key=${GITHUB_TOKEN}
+          EOF
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.OMNIXYS_TOKEN }}
 
       # 🔐 Publish to GitHub Packages / Maven
       - name: Publish

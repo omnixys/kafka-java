@@ -1,6 +1,8 @@
 package com.omnixys.kafka.producer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import com.omnixys.context.ContextAccessor;
+import com.omnixys.context.ContextSnapshot;
 import com.omnixys.kafka.adapter.KafkaHeaderAdapter;
 import com.omnixys.kafka.model.KafkaEnvelope;
 import com.omnixys.kafka.model.KafkaHeaderMapper;
@@ -13,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import org.springframework.kafka.support.SendResult;
+import java.util.concurrent.CompletableFuture;
 import java.nio.charset.StandardCharsets;
 
 import static com.omnixys.kafka.utils.MetadataKeys.SPAN_ID;
@@ -68,11 +72,9 @@ public class KafkaProducerService {
                     ctx.spanId().getBytes(StandardCharsets.UTF_8)
             );
         }
-        record.headers().forEach(h -> {
-            log.info("HEADER {} = {}", h.key(), new String(h.value()));
-        });
+        injectContextHeaders(record);
 
-        kafkaTemplate.send(record);
+        sendAsync(record, topic);
         } catch (Exception e) {
             throw new RuntimeException("Kafka send failed topic=" + topic, e);
         }
@@ -112,13 +114,9 @@ public class KafkaProducerService {
                                 ctx.spanId().getBytes(StandardCharsets.UTF_8)
                         );
                     }
+                    injectContextHeaders(record);
 
-                    record.headers().forEach(h -> {
-                        log.info("HEADER {} = {}", h.key(), new String(h.value()));
-                    });
-
-
-                    kafkaTemplate.send(record);
+                    sendAsync(record, topic);
                     log.debug("Kafka message sent topic={} key={}", topic, key);
                     return null;
                 } catch (Exception e) {
@@ -129,6 +127,38 @@ public class KafkaProducerService {
             });
         } catch (Exception e) {
             throw new RuntimeException("Kafka send failed topic=" + topic, e);
+        }
+    }
+
+    private void sendAsync(ProducerRecord<String, String> record, String topic) {
+        CompletableFuture<SendResult<String, String>> future = kafkaTemplate.send(record);
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Kafka send failed topic={} key={}", topic, record.key(), ex);
+            } else {
+                log.debug("Kafka message sent topic={} key={} offset={}", topic, record.key(),
+                        result.getRecordMetadata().offset());
+            }
+        });
+    }
+
+    private void injectContextHeaders(ProducerRecord<String, String> record) {
+        ContextSnapshot snapshot = ContextAccessor.get();
+        if (snapshot == null) return;
+        record.headers().add("x-request-id", snapshot.requestId().getBytes(StandardCharsets.UTF_8));
+        record.headers().add("x-correlation-id", snapshot.correlationId().getBytes(StandardCharsets.UTF_8));
+        if (snapshot.tenant() != null) {
+            byte[] tenantBytes = snapshot.tenant().tenantId().getBytes(StandardCharsets.UTF_8);
+            record.headers().add("x-tenant-id", tenantBytes);
+            record.headers().add("x-meta-tenantId", tenantBytes);
+        }
+        if (snapshot.principal() != null) {
+            String actorId = snapshot.principal().actorId() != null
+                    ? snapshot.principal().actorId()
+                    : snapshot.principal().subject();
+            byte[] actorBytes = actorId.getBytes(StandardCharsets.UTF_8);
+            record.headers().add("x-actor-id", actorBytes);
+            record.headers().add("x-meta-actorId", actorBytes);
         }
     }
 }

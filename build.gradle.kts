@@ -2,7 +2,7 @@ plugins {
     java
     `java-library`
     `maven-publish`
-    id("org.springframework.boot") version "4.0.4" apply false
+    id("org.springframework.boot") version "4.1.0" apply false
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -13,14 +13,14 @@ description = "Omnixys Kafka Spring Integration Package"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
+        languageVersion.set(JavaLanguageVersion.of(26))
     }
     withSourcesJar()
     withJavadocJar()
 }
 
 repositories {
-    //mavenLocal()
+    mavenLocal()
     mavenCentral()
 
     maven {
@@ -35,11 +35,23 @@ repositories {
                         ?: ""
         }
     }
+    maven {
+        name = "GitHubContext"
+        url = uri("https://maven.pkg.github.com/omnixys/context-java")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR")
+                ?: project.findProperty("gpr.user") as String?
+                        ?: ""
+            password = System.getenv("GITHUB_TOKEN")
+                ?: project.findProperty("gpr.key") as String?
+                        ?: ""
+        }
+    }
 }
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:4.0.4")
+        mavenBom("org.springframework.boot:spring-boot-dependencies:4.1.0")
     }
 }
 
@@ -47,17 +59,29 @@ dependencies {
     api("com.omnixys:observability:1.0.0")
 
     api("org.springframework.kafka:spring-kafka")
+    implementation("io.opentelemetry:opentelemetry-api")
     api("org.springframework.boot:spring-boot-autoconfigure")
 
-    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.omnixys:context:1.0.0")
+
+    implementation("tools.jackson.core:jackson-databind")
 
     implementation("org.slf4j:slf4j-api")
+    compileOnly("org.springframework.boot:spring-boot-starter-actuator")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
+
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.assertj:assertj-core")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }
 
 tasks.withType<JavaCompile> {
-    options.release.set(25)
+    options.release.set(26)
 }
 
 /**

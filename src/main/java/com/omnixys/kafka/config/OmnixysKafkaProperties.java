@@ -21,6 +21,7 @@ public class OmnixysKafkaProperties {
 
     private Producer producer = new Producer();
     private Consumer consumer = new Consumer();
+    private Dlq dlq = new Dlq();
 
     @Data
     public static class Producer {
@@ -32,5 +33,12 @@ public class OmnixysKafkaProperties {
     public static class Consumer {
         private int concurrency = 3;
         private boolean autoCommit = false;
+    }
+
+    @Data
+    public static class Dlq {
+        private boolean enabled = true;
+        private String suffix = ".DLT";
+        private int maxRetries = 3;
     }
 }

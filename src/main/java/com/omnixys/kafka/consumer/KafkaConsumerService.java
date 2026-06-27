@@ -1,41 +1,56 @@
 package com.omnixys.kafka.consumer;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import com.omnixys.context.ClientMetadata;
+import com.omnixys.context.ContextAccessor;
+import com.omnixys.context.ContextSnapshot;
+import com.omnixys.context.PrincipalContext;
+import com.omnixys.context.TenantContext;
+import com.omnixys.context.TraceMetadata;
+import com.omnixys.context.TransportMetadata;
 import com.omnixys.kafka.config.OmnixysKafkaProperties;
 import com.omnixys.kafka.dispatcher.KafkaEventDispatcher;
 import com.omnixys.kafka.model.KafkaEnvelope;
-import com.omnixys.kafka.utils.KafkaHeaderCarrier;
 import com.omnixys.kafka.utils.KafkaHeaderGetter;
 import com.omnixys.kafka.utils.KafkaHeaderUtils;
-import com.omnixys.observability.context.ITraceContext;
-import com.omnixys.observability.propagation.ContextPropagator;
-import com.omnixys.observability.propagation.W3CTraceContextPropagator;
-import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 
-/**
- * Kafka consumer with OpenTelemetry tracing.
- */
 @Slf4j
-@Service
-@RequiredArgsConstructor
 public class KafkaConsumerService {
+
+    private static final long DEDUP_TTL_SECONDS = 86400;
 
     private final KafkaEventDispatcher dispatcher;
     private final ObjectMapper mapper;
     private final OmnixysKafkaProperties properties;
+    private final OpenTelemetry openTelemetry;
+    private final EventDeduplicationService dedup;
+
+    public KafkaConsumerService(
+            KafkaEventDispatcher dispatcher,
+            ObjectMapper mapper,
+            OmnixysKafkaProperties properties,
+            OpenTelemetry openTelemetry,
+            EventDeduplicationService dedup
+    ) {
+        this.dispatcher = dispatcher;
+        this.mapper = mapper;
+        this.properties = properties;
+        this.openTelemetry = openTelemetry;
+        this.dedup = dedup;
+    }
 
     @KafkaListener(
             topics = "#{@kafkaEventDispatcher.getTopics()}",
@@ -48,16 +63,12 @@ public class KafkaConsumerService {
                 record.key()
         );
 
-        record.headers().forEach(h -> {
-            log.info("CONSUMER HEADER {} = {}", h.key(), new String(h.value()));
-        });
-
-        Context parentContext = GlobalOpenTelemetry.get()
+        Context parentContext = openTelemetry
                 .getPropagators()
                 .getTextMapPropagator()
                 .extract(Context.current(), record.headers(), new KafkaHeaderGetter());
 
-        Tracer tracer = GlobalOpenTelemetry.getTracer("omnixys.kafka.consumer");
+        Tracer tracer = openTelemetry.getTracer("omnixys.kafka.consumer");
 
         var span = tracer.spanBuilder("kafka.consume." + record.topic())
                 .setSpanKind(SpanKind.CONSUMER)
@@ -71,9 +82,6 @@ public class KafkaConsumerService {
                 .setAttribute("messaging.method", "receive")
                 .startSpan();
 
-        log.debug("NEW spanId={}", span.getSpanContext().getSpanId());
-        log.debug("PARENT traceId={}", span.getSpanContext().getTraceId());
-
         try (var scope = span.makeCurrent()) {
 
             KafkaEnvelope<?> envelope =
@@ -82,23 +90,28 @@ public class KafkaConsumerService {
                             new TypeReference<KafkaEnvelope<Object>>() {}
                     );
 
-            // 🔥 Headers → Map
+            if (envelope.eventId() != null && dedup.isDuplicate(envelope.eventId())) {
+                log.warn("Duplicate event detected topic={} eventId={}", record.topic(), envelope.eventId());
+                span.setAttribute("app.dedup", "skipped");
+                return;
+            }
+
             Map<String, String> headerMap = KafkaHeaderUtils.toMap(record.headers());
 
-            log.debug("Headers: {}", headerMap);
+            if (headerMap.containsKey("x-meta-tenantId")) {
+                span.setAttribute("app.x-meta-tenantId", headerMap.get("x-meta-tenantId"));
+            }
+            if (headerMap.containsKey("x-meta-actorId")) {
+                span.setAttribute("app.x-meta-actorId", headerMap.get("x-meta-actorId"));
+            }
 
-            // ✅ Custom metadata → Span Attributes
-            headerMap.forEach((key, value) -> {
-                if (key != null && value != null) {
-
-                    // nur deine custom keys
-                    if (key.startsWith("x-meta-")) {
-                        span.setAttribute("app." + key, value);
-                    }
-                }
-            });
+            rebuildContext(record, headerMap);
 
             dispatcher.dispatch(record.topic(), envelope, headerMap);
+
+            if (envelope.eventId() != null) {
+                dedup.markProcessed(envelope.eventId(), DEDUP_TTL_SECONDS);
+            }
         } catch (Exception e) {
 
             log.error("Kafka consume failed topic={} partition={} offset={}",
@@ -112,7 +125,39 @@ public class KafkaConsumerService {
             span.setStatus(StatusCode.ERROR);
 
         } finally {
+            ContextAccessor.clear();
             span.end();
         }
+    }
+
+    private void rebuildContext(ConsumerRecord<String, String> record, Map<String, String> headers) {
+        String requestId = headers.get("x-request-id");
+        String correlationId = headers.get("x-correlation-id");
+        if (requestId == null || correlationId == null) return;
+
+        String tenantId = headers.get("x-tenant-id");
+        if (tenantId == null) tenantId = headers.get("x-meta-tenantId");
+        String actorId = headers.get("x-actor-id");
+        if (actorId == null) actorId = headers.get("x-meta-actorId");
+
+        TenantContext tenant = tenantId != null ? new TenantContext(tenantId, "kafka", false) : null;
+        PrincipalContext principal = actorId != null
+                ? new PrincipalContext(actorId, actorId, actorId, tenantId != null ? tenantId : "unknown", List.of(), null, null, null)
+                : null;
+        ClientMetadata client = new ClientMetadata(null, null, null, null, null, null, null, null, null);
+        TransportMetadata transport = new TransportMetadata(
+                "kafka", null, null, null, null, null,
+                record.topic(),
+                record.partition(),
+                String.valueOf(record.offset()),
+                properties.getGroupId(),
+                null, null, null
+        );
+
+        ContextSnapshot snapshot = new ContextSnapshot(
+                requestId, correlationId, System.currentTimeMillis(),
+                tenant, principal, client, transport, new TraceMetadata(null, null)
+        );
+        ContextAccessor.set(snapshot);
     }
 }

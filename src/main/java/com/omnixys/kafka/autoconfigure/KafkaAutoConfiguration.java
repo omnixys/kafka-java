@@ -1,17 +1,20 @@
 package com.omnixys.kafka.autoconfigure;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.omnixys.kafka.config.OmnixysKafkaProperties;
+import com.omnixys.kafka.consumer.EventDeduplicationService;
 import com.omnixys.kafka.consumer.KafkaConsumerService;
 import com.omnixys.kafka.dispatcher.KafkaEventDispatcher;
 import com.omnixys.kafka.producer.KafkaProducerService;
 import com.omnixys.observability.api.TracePropagation;
+import io.opentelemetry.api.OpenTelemetry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -21,9 +24,13 @@ import org.springframework.context.annotation.Role;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.listener.CommonLoggingErrorHandler;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.util.backoff.FixedBackOff;
+import org.springframework.util.backoff.ExponentialBackOff;
 import com.omnixys.kafka.autoconfigure.KafkaHandlerBeanPostProcessor;
+import com.omnixys.kafka.health.KafkaHealthIndicator;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -66,12 +73,32 @@ public class KafkaAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public EventDeduplicationService eventDeduplicationService() {
+        return new EventDeduplicationService() {
+            private final java.util.Set<String> processed = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+            @Override
+            public boolean isDuplicate(String eventId) {
+                return processed.contains(eventId);
+            }
+
+            @Override
+            public void markProcessed(String eventId, long ttlSeconds) {
+                processed.add(eventId);
+            }
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public KafkaConsumerService kafkaConsumerService(
             KafkaEventDispatcher dispatcher,
             ObjectMapper mapper,
-            OmnixysKafkaProperties properties
+            OmnixysKafkaProperties properties,
+            OpenTelemetry openTelemetry,
+            EventDeduplicationService dedup
     ) {
-        return new KafkaConsumerService(dispatcher, mapper, properties);
+        return new KafkaConsumerService(dispatcher, mapper, properties, openTelemetry, dedup);
     }
 
 
@@ -79,7 +106,8 @@ public class KafkaAutoConfiguration {
     @ConditionalOnMissingBean(name = "kafkaListenerContainerFactory")
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
             ConsumerFactory<String, String> consumerFactory,
-            OmnixysKafkaProperties props
+            OmnixysKafkaProperties props,
+            KafkaTemplate<String, String> kafkaTemplate
     ) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
@@ -88,7 +116,29 @@ public class KafkaAutoConfiguration {
         factory.setConsumerFactory(consumerFactory);
         factory.setConcurrency(props.getConsumer().getConcurrency());
 
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+        CommonErrorHandler errorHandler = createErrorHandler(props, kafkaTemplate);
+        factory.setCommonErrorHandler(errorHandler);
+        return factory;
+    }
+
+    private CommonErrorHandler createErrorHandler(OmnixysKafkaProperties props, KafkaTemplate<String, String> kafkaTemplate) {
+        var backOff = new ExponentialBackOff();
+        backOff.setInitialInterval(500L);
+        backOff.setMultiplier(2.0);
+        backOff.setMaxInterval(30000L);
+        backOff.setMaxElapsedTime(props.getDlq().getMaxRetries() * 10000L);
+
+        if (props.getDlq().isEnabled()) {
+            DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+                    kafkaTemplate,
+                    (record, ex) -> new org.apache.kafka.common.TopicPartition(
+                            record.topic() + props.getDlq().getSuffix(),
+                            record.partition()
+                    )
+            );
+            return new DefaultErrorHandler(recoverer, backOff);
+        }
+        return new DefaultErrorHandler(
                 (record, exception) -> log.error(
                         "Kafka failed permanently topic={} partition={} offset={}",
                         record.topic(),
@@ -96,11 +146,8 @@ public class KafkaAutoConfiguration {
                         record.offset(),
                         exception
                 ),
-                new FixedBackOff(1000L, 3)
+                backOff
         );
-
-        factory.setCommonErrorHandler(errorHandler);
-        return factory;
     }
 
     @Bean
@@ -152,6 +199,8 @@ public class KafkaAutoConfiguration {
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 
         config.put(ProducerConfig.ACKS_CONFIG, props.getProducer().getAcks());
+        config.put(ProducerConfig.RETRIES_CONFIG, props.getProducer().getRetries());
+        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
 
         return new DefaultKafkaProducerFactory<>(config);
     }
@@ -162,5 +211,12 @@ public class KafkaAutoConfiguration {
             ProducerFactory<String, String> producerFactory
     ) {
         return new KafkaTemplate<>(producerFactory);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "org.springframework.boot.health.contributor.HealthIndicator")
+    public KafkaHealthIndicator kafkaHealthIndicator(OmnixysKafkaProperties props) {
+        return new KafkaHealthIndicator(props.getBootstrapServers());
     }
 }

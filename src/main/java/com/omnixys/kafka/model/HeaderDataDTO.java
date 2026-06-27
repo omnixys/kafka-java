@@ -1,11 +1,8 @@
 package com.omnixys.kafka.model;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-
 /**
  * Metadata extracted from service context and attached to Kafka events.
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public record HeaderDataDTO(
         String service,
         String version,
