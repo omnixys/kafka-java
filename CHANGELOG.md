@@ -3,6 +3,12 @@
 All notable changes in this project will be documented in this file.
 
 
+## [1.0.3](https://github.com/omnixys/kafka-java/compare/v1.0.2...v1.0.3) (2026-07-23)
+
+### Deps
+
+* **Deps:** update commons+context+observability deps version ([](https://github.com/omnixys/kafka-java/commit/5553dbcd6df30cad1940f17e85f1f99aa7b89fcb))
+
 ## [1.0.2](https://github.com/omnixys/kafka-java/compare/v1.0.1...v1.0.2) (2026-07-23)
 
 ### Deps
