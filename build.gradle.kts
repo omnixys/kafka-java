@@ -4,6 +4,7 @@ plugins {
     `maven-publish`
     id("org.springframework.boot") version "4.1.0" apply false
     id("io.spring.dependency-management") version "1.1.7"
+    id("com.github.ben-manes.versions") version "0.52.0"
 }
 
 
@@ -56,7 +57,7 @@ dependencyManagement {
 }
 
 dependencies {
-    api("com.omnixys:observability:1.0.0")
+    api("com.omnixys:observability:1.0.1")
 
     api("org.springframework.kafka:spring-kafka")
     implementation("io.opentelemetry:opentelemetry-api")
