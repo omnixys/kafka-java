@@ -1,4 +1,5 @@
-[versions.omnixys]
-commons = "1.0.4"
-context = "1.0.2"
-observability = "1.1.2"
+# table = Schluessel/Wert-Paare
+[versions]
+omnixys-commons = "1.0.4"
+omnixys-context = "1.0.2"
+omnixys-observability = "1.1.2"
