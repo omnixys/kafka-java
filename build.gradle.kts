@@ -57,13 +57,12 @@ dependencyManagement {
 }
 
 dependencies {
-    api("com.omnixys:observability:1.0.1")
+    api("com.omnixys:observability:{libs.versions.omnixys.observability.get()}")
+    implementation("com.omnixys:context:${libs.versions.omnixys.context.get()}")
 
     api("org.springframework.kafka:spring-kafka")
     implementation("io.opentelemetry:opentelemetry-api")
     api("org.springframework.boot:spring-boot-autoconfigure")
-
-    implementation("com.omnixys:context:1.0.0")
 
     implementation("tools.jackson.core:jackson-databind")
 
