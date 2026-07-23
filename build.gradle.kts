@@ -57,7 +57,7 @@ dependencyManagement {
 }
 
 dependencies {
-    api("com.omnixys:observability:{libs.versions.omnixys.observability.get()}")
+    api("com.omnixys:observability:${libs.versions.omnixys.observability.get()}")
     implementation("com.omnixys:context:${libs.versions.omnixys.context.get()}")
 
     api("org.springframework.kafka:spring-kafka")
