@@ -3,6 +3,16 @@
 All notable changes in this project will be documented in this file.
 
 
+## [1.0.5](https://github.com/omnixys/kafka-java/compare/v1.0.4...v1.0.5) (2026-08-22)
+
+### Agent
+
+* **Agent:** add repository development instructions ([](https://github.com/omnixys/kafka-java/commit/4b1755c893dd1dee06d98909cd479fa3b5af33db))
+
+### Dir
+
+* **Dir:** remove target dir ([](https://github.com/omnixys/kafka-java/commit/b2ca60d5eb5f072959c2592129d836b7ac26500e))
+
 ## [1.0.4](https://github.com/omnixys/kafka-java/compare/v1.0.3...v1.0.4) (2026-07-25)
 
 ### Deps
