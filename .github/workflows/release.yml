@@ -12,24 +12,66 @@ permissions:
 jobs:
 
   # =========================
+  # BUILD
+  # =========================
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: 🔐 Configure Gradle credentials for GitHub Packages
+        run: |
+          mkdir -p ~/.gradle
+          cat <<EOF > ~/.gradle/gradle.properties
+          gpr.user=${GITHUB_ACTOR}
+          gpr.key=${GITHUB_TOKEN}
+          EOF
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.OMNIXYS_TOKEN }}
+
+      - name: Build & Test
+        run: ./gradlew test
+
+
+  # =========================
   # RELEASE (semantic-release)
   # =========================
   release:
     runs-on: ubuntu-latest
+    needs: build
 
     outputs:
       released: ${{ steps.semantic.outputs.released }}
+      version: ${{ steps.semantic.outputs.version }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # 🔥 REQUIRED for tags + history
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '26.8.1'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
 
       - name: Install semantic-release
         run: |
@@ -40,13 +82,14 @@ jobs:
             @semantic-release/commit-analyzer \
             @semantic-release/release-notes-generator \
             @semantic-release/exec \
-            conventional-changelog-conventionalcommits
+            conventional-changelog-conventionalcommits@^9
 
       - name: Run semantic-release
         id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -o pipefail
           npx semantic-release | tee log.txt
 
           if grep -q "Published release" log.txt; then
@@ -54,6 +97,9 @@ jobs:
           else
             echo "released=false" >> $GITHUB_OUTPUT
           fi
+
+          VERSION=$(grep '^version=' gradle.properties | cut -d'=' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
 
   # =========================
@@ -67,7 +113,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

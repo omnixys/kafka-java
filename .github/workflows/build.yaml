@@ -1,0 +1,41 @@
+name: Build
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: 🔐 Configure Gradle credentials for GitHub Packages
+        run: |
+          mkdir -p ~/.gradle
+          cat <<EOF > ~/.gradle/gradle.properties
+          gpr.user=${GITHUB_ACTOR}
+          gpr.key=${GITHUB_TOKEN}
+          EOF
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.OMNIXYS_TOKEN }}
+
+      - name: Build & Test
+        run: ./gradlew test
