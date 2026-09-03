@@ -3,6 +3,21 @@
 All notable changes in this project will be documented in this file.
 
 
+## [1.0.6](https://github.com/omnixys/kafka-java/compare/v1.0.5...v1.0.6) (2026-09-03)
+
+### Ci
+
+* **Ci:** add update release rule for patch releases ([](https://github.com/omnixys/kafka-java/commit/c9db62eb5ecb818efeea0a1e46776b94942c2a87))
+* **Ci:** align CI structure with full workflow set, 3-job release, and pinned conventionalcommits ([](https://github.com/omnixys/kafka-java/commit/eb5b9451c63a6fb9d4f6e5133fa7a825764ca355))
+
+### Other
+
+* **Other:** Merge pull request #1 from omnixys/migration/uuid-v7 ([](https://github.com/omnixys/kafka-java/commit/34751719cd891c3392da4e05ed798f1760a9c42a)), closes [#1](https://github.com/omnixys/kafka-java/issues/1)
+
+### Runtime
+
+* **Runtime:** align spring boot and build toolchain to local standard ([](https://github.com/omnixys/kafka-java/commit/55b024b62cd22dc3c7af67154e93cfb06214b2b8))
+
 ## [1.0.5](https://github.com/omnixys/kafka-java/compare/v1.0.4...v1.0.5) (2026-08-22)
 
 ### Agent
